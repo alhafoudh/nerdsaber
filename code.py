@@ -10,15 +10,31 @@ import board
 import neopixel
 import adafruit_lis3dh
 import random
+from adafruit_debouncer import Button
 
 # CUSTOMIZE YOUR COLOR HERE:
 # (red, green, blue) -- each 0 (off) to 255 (brightest)
-# COLOR = (255, 0, 0)  # red
-# COLOR = (0, 255, 0)  # green
-# COLOR = (0, 0, 255)  # blue
-COLOR = (128, 0, 239)  # purple
-# COLOR = (255, 255, 255)  # white
-# COLOR = (0, 100, 255) #cyan
+RED_COLOR = (255, 0, 0)
+GREEN_COLOR = (0, 255, 0)
+BLUE_COLOR = (0, 0, 255)
+WHITE_COLOR = (255, 255, 255)
+PURPLE_COLOR = (128, 0, 255)
+CYAN_COLOR = (0, 100, 255)
+YELLOW_COLOR = (255, 255, 0)
+ORANGE_COLOR = (255, 165, 0)
+
+COLOR_INDEX = 0
+COLORS = [
+    BLUE_COLOR,
+    GREEN_COLOR,
+    WHITE_COLOR,
+    YELLOW_COLOR,
+    CYAN_COLOR,
+    PURPLE_COLOR,
+    ORANGE_COLOR,
+    RED_COLOR,
+]
+COLOR = COLORS[COLOR_INDEX]
 
 # CUSTOMIZE SENSITIVITY HERE: smaller numbers = more sensitive to motion
 HIT_THRESHOLD = 700  # 250
@@ -48,9 +64,11 @@ strip = neopixel.NeoPixel(NEOPIXEL_PIN, NUM_PIXELS, brightness=1.0, auto_write=F
 strip.fill(0)  # NeoPixels off ASAP on startup
 strip.show()
 
-switch = DigitalInOut(SWITCH_PIN)
-switch.direction = Direction.INPUT
-switch.pull = Pull.UP
+switch_pin = DigitalInOut(SWITCH_PIN)
+switch_pin.direction = Direction.INPUT
+switch_pin.pull = Pull.UP
+
+button = Button(switch_pin)
 
 time.sleep(0.1)
 
@@ -58,12 +76,6 @@ time.sleep(0.1)
 i2c = busio.I2C(board.SCL, board.SDA)
 accel = adafruit_lis3dh.LIS3DH_I2C(i2c)
 accel.range = adafruit_lis3dh.RANGE_4_G
-
-# "Idle" color is 1/4 brightness, "swinging" color is full brightness...
-COLOR_IDLE = (int(COLOR[0] / 1), int(COLOR[1] / 1), int(COLOR[2] / 1))
-COLOR_SWING = COLOR
-COLOR_HIT = (255, 255, 255)  # "hit" color is white
-COLOR_ACTIVE = COLOR_IDLE
 
 TRIGGER_TIME = 0.0
 
@@ -102,6 +114,31 @@ hit_sounds = [
 
 mixer = audiomixer.Mixer(voice_count=2, sample_rate=22050, channel_count=1, bits_per_sample=16, samples_signed=True)
 audio.play(mixer)
+
+# "Idle" color is 1/4 brightness, "swinging" color is full brightness...
+COLOR_HIT = (255, 255, 255)  # "hit" color is white
+COLOR_IDLE = (0, 0, 0)
+COLOR_SWING = (0, 0, 0)
+COLOR_ACTIVE = (0, 0, 0)
+
+
+def set_color(index):
+    global COLOR_INDEX, COLOR, COLOR_IDLE, COLOR_SWING, COLOR_ACTIVE
+
+    COLOR_INDEX = index
+    COLOR = COLORS[COLOR_INDEX]
+    COLOR_IDLE = (int(COLOR[0] / 1), int(COLOR[1] / 1), int(COLOR[2] / 1))
+    COLOR_SWING = COLOR
+    COLOR_ACTIVE = COLOR_IDLE
+
+    print('Color is set to ' + str(index) + ' -> ' + str(COLOR))
+
+
+set_color(0)
+
+
+def cycle_color():
+    set_color((COLOR_INDEX + 1) % len(COLORS))
 
 
 def play_track(voice, sounds, volume=1.0, loop=False):
@@ -176,22 +213,22 @@ def mix(color_1, color_2, weight_2):
 # Main program loop, repeats indefinitely
 while True:
     red_led.value = True
+    button.update()
 
-    if not switch.value:  # button pressed?
+    if button.long_press:
         if mode == 0:  # If currently off...
             enable.value = True
             blue_led.value = True
             power('on', 1.75, False)  # Power up!
             play_track(0, idle_sounds, loop=True)
             mode = 1  # ON (idle) mode now
-        else:  # else is currently on...
+        else:
             blue_led.value = False
             power('off', 1.15, True)  # Power down
             mode = 0  # OFF mode now
             enable.value = False
-        while not switch.value:  # Wait for button release
-            time.sleep(0.2)  # to avoid repeated triggering
-
+    elif button.short_count == 2:
+        cycle_color()
     elif mode >= 1:  # If not OFF mode...
         x, y, z = accel.acceleration  # Read accelerometer
         accel_total = x * x + z * z
