@@ -46,9 +46,8 @@ WHITE_COLOR = (255, 255, 255)
 PURPLE_COLOR = (128, 0, 255)
 CYAN_COLOR = (0, 100, 255)
 YELLOW_COLOR = (255, 255, 0)
-ORANGE_COLOR = (255, 165, 0)
+ORANGE_COLOR = (255, 80, 0)
 
-COLOR_INDEX = get_setting("color", 0)
 COLORS = [
     BLUE_COLOR,
     GREEN_COLOR,
@@ -59,6 +58,7 @@ COLORS = [
     ORANGE_COLOR,
     RED_COLOR,
 ]
+COLOR_INDEX = get_setting("color", 0)
 COLOR = COLORS[COLOR_INDEX]
 
 # CUSTOMIZE SENSITIVITY HERE: smaller numbers = more sensitive to motion
