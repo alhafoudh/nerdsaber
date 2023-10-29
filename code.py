@@ -104,7 +104,8 @@ accel.range = adafruit_lis3dh.RANGE_4_G
 
 TRIGGER_TIME = 0.0
 
-VOLUME = 1.0
+DEFAULT_VOLUME = 0.05
+VOLUME = DEFAULT_VOLUME
 
 on_sounds = [
     audiocore.WaveFile(open('sounds/on0.wav', 'rb'))
@@ -129,12 +130,10 @@ swing_sounds = [
     audiocore.WaveFile(open('sounds/swing7.wav', 'rb')),
 ]
 
-hit_sounds = [
-    audiocore.WaveFile(open('sounds/hit0.wav', 'rb')),
-    audiocore.WaveFile(open('sounds/hit1.wav', 'rb')),
-    audiocore.WaveFile(open('sounds/hit2.wav', 'rb')),
-    audiocore.WaveFile(open('sounds/hit3.wav', 'rb')),
-    audiocore.WaveFile(open('sounds/hit4.wav', 'rb')),
+strike_sounds = [
+    audiocore.WaveFile(open('sounds/strike0.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/strike1.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/strike2.wav', 'rb')),
 ]
 
 mixer = audiomixer.Mixer(voice_count=2, sample_rate=22050, channel_count=1, bits_per_sample=16, samples_signed=True)
@@ -173,7 +172,7 @@ def play_track(voice, sounds, volume=1.0, loop=False):
 
 def power(sound, duration, reverse):
     if reverse:
-        prev = NUM_PIXELS
+        prev = int(NUM_PIXELS / 2)
     else:
         prev = 0
     gc.collect()  # Tidy up RAM now so animation's smoother
@@ -192,13 +191,19 @@ def power(sound, duration, reverse):
         if reverse:
             fraction = 1.0 - fraction  # 1.0 to 0.0 if reverse
         fraction = math.pow(fraction, 0.5)  # Apply nonlinear curve
-        threshold = int(NUM_PIXELS * fraction + 0.5)
+        threshold = int(NUM_PIXELS / 2 * fraction + 0.5)
         num = threshold - prev  # Number of pixels to light on this pass
         if num != 0:
+            prev_rev = NUM_PIXELS - 1 - threshold
+            threshold_rev = NUM_PIXELS - 1 - prev
+            num_rev = threshold_rev - prev_rev
+
             if reverse:
                 strip[threshold:prev] = [0] * -num
+                strip[threshold_rev:prev_rev] = [0] * -num_rev
             else:
                 strip[prev:threshold] = [COLOR_IDLE] * num
+                strip[prev_rev:threshold_rev] = [COLOR_IDLE] * num_rev
             strip.show()
             # NeoPixel writes throw off time.monotonic() ever so slightly
             # because interrupts are disabled during the transfer.
@@ -236,11 +241,24 @@ def mix(color_1, color_2, weight_2):
 
 
 def power_on():
-    power('on', 1.75, False)
+    global mode
+
+    enable.value = True
+
+    blue_led.value = True
+    power('on', 1.72, False)
+    play_track(0, idle_sounds, volume=0.75, loop=True)
+    mode = 1  # ON (idle) mode now
 
 
 def power_off():
-    power('off', 1.15, True)
+    global mode
+
+    blue_led.value = False
+    power('off', 0.64, True)
+    mode = 0
+
+    enable.value = False
 
 
 # Main program loop, repeats indefinitely
@@ -250,22 +268,25 @@ while True:
 
     if button.long_press:
         if mode == 0:  # If currently off...
-            enable.value = True
-            blue_led.value = True
             power_on()
-            play_track(0, idle_sounds, volume=0.75, loop=True)
-            mode = 1  # ON (idle) mode now
         else:
-            blue_led.value = False
             power_off()
-            mode = 0  # OFF mode now
-            enable.value = False
+    elif button.short_count == 3:
+        if VOLUME == DEFAULT_VOLUME:
+            print('Turning volume off')
+            power_off()
+            VOLUME = 0.0
+            power_on()
+        else:
+            print('Turning volume on')
+            power_off()
+            VOLUME = DEFAULT_VOLUME
+            power_on()
     elif button.short_count == 2:
         power_off()
         cycle_color()
         power_on()
-        play_track(0, idle_sounds, volume=0.75, loop=True)
-    elif mode >= 1:  # If not OFF mode...
+    elif mode >= 1:
         x, y, z = accel.acceleration  # Read accelerometer
         accel_total = x * x + z * z
         # (Y axis isn't needed for this, assuming Hallowing is mounted
@@ -273,7 +294,7 @@ while True:
         # just comparing thresholds...use squared values instead, save math.)
         if accel_total > HIT_THRESHOLD:  # Large acceleration = HIT
             TRIGGER_TIME = time.monotonic()  # Save initial time of hit
-            play_track(1, hit_sounds)
+            play_track(1, strike_sounds)
             COLOR_ACTIVE = COLOR_HIT  # Set color to fade from
             mode = 3  # HIT mode
         elif mode == 1 and accel_total > SWING_THRESHOLD:
