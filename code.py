@@ -9,6 +9,7 @@ import busio
 import board
 import neopixel
 import adafruit_lis3dh
+import random
 
 # CUSTOMIZE YOUR COLOR HERE:
 # (red, green, blue) -- each 0 (off) to 255 (brightest)
@@ -62,41 +63,53 @@ accel.range = adafruit_lis3dh.RANGE_4_G
 COLOR_IDLE = (int(COLOR[0] / 1), int(COLOR[1] / 1), int(COLOR[2] / 1))
 COLOR_SWING = COLOR
 COLOR_HIT = (255, 255, 255)  # "hit" color is white
+COLOR_ACTIVE = COLOR_IDLE
 
-on_sound = audiocore.WaveFile(open('sounds/on.wav', 'rb'))
-off_sound = audiocore.WaveFile(open('sounds/off.wav', 'rb'))
-idle_sound = audiocore.WaveFile(open('sounds/idle.wav', 'rb'))
-swing_sound = audiocore.WaveFile(open('sounds/swing.wav', 'rb'))
-hit_sound = audiocore.WaveFile(open('sounds/hit.wav', 'rb'))
+TRIGGER_TIME = 0.0
+
+VOLUME = 0.05
+
+on_sounds = [
+    audiocore.WaveFile(open('sounds/on0.wav', 'rb'))
+]
+
+off_sounds = [
+    audiocore.WaveFile(open('sounds/off0.wav', 'rb'))
+]
+
+idle_sounds = [
+    audiocore.WaveFile(open('sounds/idle1.wav', 'rb'))
+]
+
+swing_sounds = [
+    audiocore.WaveFile(open('sounds/swing0.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/swing1.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/swing2.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/swing3.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/swing4.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/swing5.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/swing6.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/swing7.wav', 'rb')),
+]
+
+hit_sounds = [
+    audiocore.WaveFile(open('sounds/hit0.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/hit1.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/hit2.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/hit3.wav', 'rb')),
+    audiocore.WaveFile(open('sounds/hit4.wav', 'rb')),
+]
 
 mixer = audiomixer.Mixer(voice_count=2, sample_rate=22050, channel_count=1, bits_per_sample=16, samples_signed=True)
 audio.play(mixer)
 
 
-def play_wav(name, loop=False):
-    """
-    Play a WAV file in the 'sounds' directory.
-    @param name: partial file name string, complete name will be built around
-                 this, e.g. passing 'foo' will play file 'sounds/foo.wav'.
-    @param loop: if True, sound will repeat indefinitely (until interrupted
-                 by another sound).
-    """
-    print("playing", name)
-    try:
-        wave_file = open('sounds/' + name + '.wav', 'rb')
-        wave = audiocore.WaveFile(wave_file)
-        audio.play(wave, loop=loop)
-    except:
-        return
+def play_track(voice, sounds, volume=1.0, loop=False):
+    mixer.voice[voice].play(random.choice(sounds), loop=loop)
+    mixer.voice[voice].level = volume * VOLUME
 
 
 def power(sound, duration, reverse):
-    """
-    Animate NeoPixels with accompanying sound effect for power on / off.
-    @param sound:    sound name (similar format to play_wav() above)
-    @param duration: estimated duration of sound, in seconds (>0.0)
-    @param reverse:  if True, do power-off effect (reverses animation)
-    """
     if reverse:
         prev = NUM_PIXELS
     else:
@@ -104,12 +117,10 @@ def power(sound, duration, reverse):
     gc.collect()  # Tidy up RAM now so animation's smoother
     start_time = time.monotonic()  # Save audio start time
 
-    if reverse:
-        # audio.play(off_sound, loop=False)
-        mixer.voice[0].play(off_sound)
-    else:
-        # audio.play(on_sound, loop=False)
-        mixer.voice[0].play(on_sound)
+    if sound == 'on':
+        play_track(0, on_sounds)
+    elif sound == 'off':
+        play_track(0, off_sounds)
 
     while True:
         elapsed = time.monotonic() - start_time  # Time spent playing sound
@@ -139,8 +150,9 @@ def power(sound, duration, reverse):
     else:
         strip.fill(COLOR_IDLE)  # or all pixels set on
     strip.show()
-    # while audio.playing:  # Wait until audio done
-    #     pass
+
+    while mixer.voice[0].playing:  # Wait until audio done
+        pass
 
 
 def mix(color_1, color_2, weight_2):
@@ -163,7 +175,6 @@ def mix(color_1, color_2, weight_2):
 
 # Main program loop, repeats indefinitely
 while True:
-
     red_led.value = True
 
     if not switch.value:  # button pressed?
@@ -171,7 +182,7 @@ while True:
             enable.value = True
             blue_led.value = True
             power('on', 1.75, False)  # Power up!
-            mixer.voice[0].play(idle_sound, loop=True)
+            play_track(0, idle_sounds, loop=True)
             mode = 1  # ON (idle) mode now
         else:  # else is currently on...
             blue_led.value = False
@@ -189,17 +200,16 @@ while True:
         # just comparing thresholds...use squared values instead, save math.)
         if accel_total > HIT_THRESHOLD:  # Large acceleration = HIT
             TRIGGER_TIME = time.monotonic()  # Save initial time of hit
-            # audio.play(hit_sound, loop=False)
-            mixer.voice[1].play(hit_sound)
+            play_track(1, hit_sounds)
             COLOR_ACTIVE = COLOR_HIT  # Set color to fade from
             mode = 3  # HIT mode
-        elif mode == 1 and accel_total > SWING_THRESHOLD:  # Mild = SWING
+        elif accel_total > SWING_THRESHOLD:  # Mild = SWING
             TRIGGER_TIME = time.monotonic()  # Save initial time of swing
-            # audio.play(swing_sound, loop=False)
-            mixer.voice[1].play(swing_sound)
+            play_track(1, swing_sounds)
             COLOR_ACTIVE = COLOR_SWING  # Set color to fade from
             mode = 2  # SWING mode
-        elif mode > 1:  # If in SWING or HIT mode...
+
+        if mode > 1:  # If in SWING or HIT mode...
             if mixer.voice[1].playing:  # And sound currently playing...
                 blend = time.monotonic() - TRIGGER_TIME  # Time since triggered
                 if mode == 2:  # If SWING,
@@ -207,7 +217,6 @@ while True:
                 strip.fill(mix(COLOR_ACTIVE, COLOR_IDLE, blend))
                 strip.show()
             else:  # No sound now, but still MODE > 1
-                # audio.play(idle_sound, loop=True)
                 strip.fill(COLOR_IDLE)  # Set to idle color
                 strip.show()
                 mode = 1  # IDLE mode now
