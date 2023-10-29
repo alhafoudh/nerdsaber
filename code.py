@@ -235,6 +235,14 @@ def mix(color_1, color_2, weight_2):
             int(color_1[2] * weight_1 + color_2[2] * weight_2))
 
 
+def power_on():
+    power('on', 1.75, False)
+
+
+def power_off():
+    power('off', 1.15, True)
+
+
 # Main program loop, repeats indefinitely
 while True:
     red_led.value = True
@@ -244,18 +252,19 @@ while True:
         if mode == 0:  # If currently off...
             enable.value = True
             blue_led.value = True
-            power('on', 1.75, False)  # Power up!
-            play_track(0, idle_sounds, loop=True)
+            power_on()
+            play_track(0, idle_sounds, volume=0.5, loop=True)
             mode = 1  # ON (idle) mode now
         else:
             blue_led.value = False
-            power('off', 1.15, True)  # Power down
+            power_off()
             mode = 0  # OFF mode now
             enable.value = False
     elif button.short_count == 2:
+        power_off()
         cycle_color()
-        strip.fill(COLOR)
-        strip.show()
+        power_on()
+        play_track(0, idle_sounds, volume=0.5, loop=True)
     elif mode >= 1:  # If not OFF mode...
         x, y, z = accel.acceleration  # Read accelerometer
         accel_total = x * x + z * z
