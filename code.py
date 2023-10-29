@@ -14,8 +14,8 @@ import adafruit_lis3dh
 # (red, green, blue) -- each 0 (off) to 255 (brightest)
 # COLOR = (255, 0, 0)  # red
 # COLOR = (0, 255, 0)  # green
-COLOR = (0, 0, 255)  # blue
-# COLOR = (100, 0, 255)  # purple
+# COLOR = (0, 0, 255)  # blue
+COLOR = (128, 0, 239)  # purple
 # COLOR = (255, 255, 255)  # white
 # COLOR = (0, 100, 255) #cyan
 
