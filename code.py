@@ -104,7 +104,7 @@ accel.range = adafruit_lis3dh.RANGE_4_G
 
 TRIGGER_TIME = 0.0
 
-VOLUME = 0.2
+VOLUME = 1.0
 
 on_sounds = [
     audiocore.WaveFile(open('sounds/on0.wav', 'rb'))
@@ -253,7 +253,7 @@ while True:
             enable.value = True
             blue_led.value = True
             power_on()
-            play_track(0, idle_sounds, volume=0.5, loop=True)
+            play_track(0, idle_sounds, volume=0.75, loop=True)
             mode = 1  # ON (idle) mode now
         else:
             blue_led.value = False
@@ -264,7 +264,7 @@ while True:
         power_off()
         cycle_color()
         power_on()
-        play_track(0, idle_sounds, volume=0.5, loop=True)
+        play_track(0, idle_sounds, volume=0.75, loop=True)
     elif mode >= 1:  # If not OFF mode...
         x, y, z = accel.acceleration  # Read accelerometer
         accel_total = x * x + z * z
