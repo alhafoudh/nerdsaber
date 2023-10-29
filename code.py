@@ -1,3 +1,4 @@
+import json
 import time
 import math
 import gc
@@ -12,6 +13,30 @@ import adafruit_lis3dh
 import random
 from adafruit_debouncer import Button
 
+
+def set_setting(key, value):
+    try:
+        settings = {}
+        with open("/settings.json", "r") as fp:
+            settings = json.load(fp)
+
+        settings = settings | {key: value}
+
+        with open("/settings.json", "w") as fp:
+            json.dump(settings, fp)
+    except Exception as e:
+        print(e)
+
+
+def get_setting(key, default):
+    try:
+        with open("/settings.json", "r") as fp:
+            return json.load(fp).get(key, default)
+    except Exception as e:
+        print(e)
+        return default
+
+
 # CUSTOMIZE YOUR COLOR HERE:
 # (red, green, blue) -- each 0 (off) to 255 (brightest)
 RED_COLOR = (255, 0, 0)
@@ -23,7 +48,7 @@ CYAN_COLOR = (0, 100, 255)
 YELLOW_COLOR = (255, 255, 0)
 ORANGE_COLOR = (255, 165, 0)
 
-COLOR_INDEX = 0
+COLOR_INDEX = get_setting("color", 0)
 COLORS = [
     BLUE_COLOR,
     GREEN_COLOR,
@@ -79,7 +104,7 @@ accel.range = adafruit_lis3dh.RANGE_4_G
 
 TRIGGER_TIME = 0.0
 
-VOLUME = 0.05
+VOLUME = 0.2
 
 on_sounds = [
     audiocore.WaveFile(open('sounds/on0.wav', 'rb'))
@@ -134,7 +159,7 @@ def set_color(index):
     print('Color is set to ' + str(index) + ' -> ' + str(COLOR))
 
 
-set_color(0)
+set_color(COLOR_INDEX)
 
 
 def cycle_color():
@@ -229,6 +254,8 @@ while True:
             enable.value = False
     elif button.short_count == 2:
         cycle_color()
+        strip.fill(COLOR)
+        strip.show()
     elif mode >= 1:  # If not OFF mode...
         x, y, z = accel.acceleration  # Read accelerometer
         accel_total = x * x + z * z
@@ -240,7 +267,7 @@ while True:
             play_track(1, hit_sounds)
             COLOR_ACTIVE = COLOR_HIT  # Set color to fade from
             mode = 3  # HIT mode
-        elif accel_total > SWING_THRESHOLD:  # Mild = SWING
+        elif mode == 1 and accel_total > SWING_THRESHOLD:
             TRIGGER_TIME = time.monotonic()  # Save initial time of swing
             play_track(1, swing_sounds)
             COLOR_ACTIVE = COLOR_SWING  # Set color to fade from
