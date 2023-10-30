@@ -100,6 +100,7 @@ time.sleep(0.1)
 i2c = busio.I2C(board.SCL, board.SDA)
 accel = adafruit_lis3dh.LIS3DH_I2C(i2c)
 accel.range = adafruit_lis3dh.RANGE_4_G
+accel.set_tap(1, 20)
 
 TRIGGER_TIME = 0.0
 
