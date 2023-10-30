@@ -83,8 +83,37 @@ green_led.direction = Direction.OUTPUT
 blue_led = DigitalInOut(board.D13)
 blue_led.direction = Direction.OUTPUT
 
-audio = audioio.AudioOut(board.A0)  # Speaker
+AUDIO_ENABLED = False
+VOLUME = 1.0
+
+audio = None
+mixer = audiomixer.Mixer(voice_count=2, sample_rate=22050, channel_count=1, bits_per_sample=16, samples_signed=True)
 mode = 0  # Initial mode = OFF
+
+
+def enable_audio():
+    global audio, AUDIO_ENABLED
+    if audio is not None:
+        audio.stop()
+        audio.deinit()
+    audio = audioio.AudioOut(board.A0)
+    audio.play(mixer)
+    AUDIO_ENABLED = True
+
+
+def disable_audio():
+    global audio, AUDIO_ENABLED
+    if audio is not None:
+        audio.stop()
+        audio.deinit()
+    audio = audioio.AudioOut(board.A1)
+    AUDIO_ENABLED = False
+
+
+if AUDIO_ENABLED:
+    enable_audio()
+else:
+    disable_audio()
 
 strip = neopixel.NeoPixel(NEOPIXEL_PIN, NUM_PIXELS, brightness=1.0, auto_write=False)
 strip.fill(0)  # NeoPixels off ASAP on startup
@@ -105,9 +134,6 @@ accel.range = adafruit_lis3dh.RANGE_4_G
 accel.set_tap(1, 127)
 
 TRIGGER_TIME = 0.0
-
-DEFAULT_VOLUME = 1.0
-VOLUME = 0.0
 
 on_sounds = [
     audiocore.WaveFile(open('sounds/on0.wav', 'rb'))
@@ -138,9 +164,6 @@ strike_sounds = [
     audiocore.WaveFile(open('sounds/strike2.wav', 'rb')),
 ]
 
-mixer = audiomixer.Mixer(voice_count=2, sample_rate=22050, channel_count=1, bits_per_sample=16, samples_signed=True)
-audio.play(mixer)
-
 # "Idle" color is 1/4 brightness, "swinging" color is full brightness...
 COLOR_HIT = (255, 255, 255)  # "hit" color is white
 COLOR_IDLE = (0, 0, 0)
@@ -168,8 +191,9 @@ def cycle_color():
 
 
 def play_track(voice, sounds, volume=1.0, loop=False):
-    mixer.voice[voice].play(random.choice(sounds), loop=loop)
-    mixer.voice[voice].level = volume * VOLUME
+    if AUDIO_ENABLED:
+        mixer.voice[voice].play(random.choice(sounds), loop=loop)
+        mixer.voice[voice].level = volume * VOLUME
 
 
 def power(sound, duration, reverse):
@@ -220,9 +244,6 @@ def power(sound, duration, reverse):
         strip.fill(COLOR_IDLE)  # or all pixels set on
     strip.show()
 
-    while mixer.voice[0].playing:  # Wait until audio done
-        pass
-
 
 def mix(color_1, color_2, weight_2):
     """
@@ -245,6 +266,8 @@ def mix(color_1, color_2, weight_2):
 def power_on():
     global mode
 
+    print('Turning on')
+
     enable.value = True
 
     blue_led.value = True
@@ -256,20 +279,25 @@ def power_on():
 def power_off():
     global mode
 
+    print('Turning off')
+
     blue_led.value = False
-    power('off', 0.64, True)
+    power('off', 1.24, True)
     mode = 0
 
     enable.value = False
 
 
 last_time = 0
+for i in range(5):
+    t = accel.tapped
+    time.sleep(0.05)
 
 while True:
     red_led.value = True
     button.update()
 
-    time.sleep(0.05)
+    time.sleep(0.01)
 
     if button.long_press:
         if mode == 0:  # If currently off...
@@ -277,12 +305,12 @@ while True:
         else:
             power_off()
     elif button.short_count == 3:
-        if VOLUME == DEFAULT_VOLUME:
+        if AUDIO_ENABLED:
             print('Turning volume off')
             was_turned_on = mode > 0
             if was_turned_on:
                 power_off()
-            VOLUME = 0.0
+            disable_audio()
             if was_turned_on:
                 power_on()
         else:
@@ -290,7 +318,7 @@ while True:
             was_turned_on = mode > 0
             if was_turned_on:
                 power_off()
-            VOLUME = DEFAULT_VOLUME
+            enable_audio()
             if was_turned_on:
                 power_on()
     elif button.short_count == 2:
@@ -315,7 +343,8 @@ while True:
             mode = 2  # SWING mode
 
         if mode > 1:  # If in SWING or HIT mode...
-            if mixer.voice[1].playing:  # And sound currently playing...
+            time_elapsed = time.monotonic() - TRIGGER_TIME
+            if time_elapsed <= 0.5:  # And sound currently playing...
                 blend = time.monotonic() - TRIGGER_TIME  # Time since triggered
                 if mode == 2:  # If SWING,
                     blend = abs(0.5 - blend) * 2.0  # ramp up, down
