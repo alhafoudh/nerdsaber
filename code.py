@@ -61,9 +61,7 @@ COLORS = [
 COLOR_INDEX = get_setting("color", 0)
 COLOR = COLORS[COLOR_INDEX]
 
-# CUSTOMIZE SENSITIVITY HERE: smaller numbers = more sensitive to motion
-HIT_THRESHOLD = 700  # 250
-SWING_THRESHOLD = 125
+SWING_THRESHOLD = 300
 
 NUM_PIXELS = 162
 NEOPIXEL_PIN = board.D5
@@ -100,7 +98,7 @@ time.sleep(0.1)
 i2c = busio.I2C(board.SCL, board.SDA)
 accel = adafruit_lis3dh.LIS3DH_I2C(i2c)
 accel.range = adafruit_lis3dh.RANGE_4_G
-accel.set_tap(1, 20)
+accel.set_tap(1, 127)
 
 TRIGGER_TIME = 0.0
 
@@ -261,10 +259,13 @@ def power_off():
     enable.value = False
 
 
-# Main program loop, repeats indefinitely
+last_time = 0
+
 while True:
     red_led.value = True
     button.update()
+
+    time.sleep(0.05)
 
     if button.long_press:
         if mode == 0:  # If currently off...
@@ -274,14 +275,20 @@ while True:
     elif button.short_count == 3:
         if VOLUME == DEFAULT_VOLUME:
             print('Turning volume off')
-            power_off()
+            was_turned_on = mode > 0
+            if was_turned_on:
+                power_off()
             VOLUME = 0.0
-            power_on()
+            if was_turned_on:
+                power_on()
         else:
             print('Turning volume on')
-            power_off()
+            was_turned_on = mode > 0
+            if was_turned_on:
+                power_off()
             VOLUME = DEFAULT_VOLUME
-            power_on()
+            if was_turned_on:
+                power_on()
     elif button.short_count == 2:
         power_off()
         cycle_color()
@@ -289,15 +296,15 @@ while True:
     elif mode >= 1:
         x, y, z = accel.acceleration  # Read accelerometer
         accel_total = x * x + z * z
-        # (Y axis isn't needed for this, assuming Hallowing is mounted
-        # sideways to stick.  Also, square root isn't needed, since we're
-        # just comparing thresholds...use squared values instead, save math.)
-        if accel_total > HIT_THRESHOLD:  # Large acceleration = HIT
+
+        if accel.tapped:
+            print('Hit!')
             TRIGGER_TIME = time.monotonic()  # Save initial time of hit
             play_track(1, strike_sounds)
             COLOR_ACTIVE = COLOR_HIT  # Set color to fade from
             mode = 3  # HIT mode
         elif mode == 1 and accel_total > SWING_THRESHOLD:
+            print('Swing!')
             TRIGGER_TIME = time.monotonic()  # Save initial time of swing
             play_track(1, swing_sounds)
             COLOR_ACTIVE = COLOR_SWING  # Set color to fade from
