@@ -66,7 +66,6 @@ HIT_THRESHOLD = 700  # 250
 SWING_THRESHOLD = 125
 
 NUM_PIXELS = 162
-# NUM_PIXELS = 85
 NEOPIXEL_PIN = board.D5
 POWER_PIN = board.D10
 SWITCH_PIN = board.D9
@@ -104,8 +103,8 @@ accel.range = adafruit_lis3dh.RANGE_4_G
 
 TRIGGER_TIME = 0.0
 
-DEFAULT_VOLUME = 0.05
-VOLUME = DEFAULT_VOLUME
+DEFAULT_VOLUME = 1.0
+VOLUME = 0.0
 
 on_sounds = [
     audiocore.WaveFile(open('sounds/on0.wav', 'rb'))
