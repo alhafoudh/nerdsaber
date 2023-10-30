@@ -1,3 +1,7 @@
+# based on https://github.com/adafruit/Adafruit_Learning_System_Guides/blob/main/PropMaker_Lightsaber/code.py
+# sounds from https://freesound.org/people/joe93barlow/packs/5968/
+# modified by Ahmed Al Hafoudh <alhafoudh@freevision.sk>
+
 import json
 import time
 import math
@@ -149,7 +153,7 @@ def set_color(index):
 
     COLOR_INDEX = index
     COLOR = COLORS[COLOR_INDEX]
-    COLOR_IDLE = (int(COLOR[0] / 1), int(COLOR[1] / 1), int(COLOR[2] / 1))
+    COLOR_IDLE = (int(COLOR[0] * 1.0), int(COLOR[1] * 1.0), int(COLOR[2] * 1.0))
     COLOR_SWING = COLOR
     COLOR_ACTIVE = COLOR_IDLE
 
